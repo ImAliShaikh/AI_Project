@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Guessing Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a73e8;
+            text-align: center;
+        }
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .difficulty-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .difficulty-btn {
+            padding: 8px 16px;
+            border: 2px solid #1a73e8;
+            border-radius: 5px;
+            background-color: white;
+            color: #1a73e8;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .difficulty-btn:hover {
+            background-color: #1a73e8;
+            color: white;
+        }
+        .difficulty-btn.active {
+            background-color: #1a73e8;
+            color: white;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid #1a73e8;
+            border-radius: 5px;
+            width: 200px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .history {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .player-history, .ai-history {
+            flex: 1;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .guess-item {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .guess-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a73e8;
+        }
+        .feedback {
+            margin-top: 5px;
+            color: #666;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .winner {
+            color: #28a745;
+        }
+        .error {
+            color: #dc3545;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .difficulty-info {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Number Guessing Game</h1>
+        <div class="game-area">
+            <div class="difficulty-selector">
+                <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+                <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+                <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+            </div>
+            <div class="difficulty-info" id="difficultyInfo">
+                Limited memory AI with 30% random guesses
+            </div>
+            <div class="status" id="status">Your turn! Enter a 4-digit number.</div>
+            <div class="input-area">
+                <input type="text" id="guessInput" placeholder="Enter 4-digit number" maxlength="4">
+                <button onclick="makeGuess()" id="guessButton">Guess</button>
+                <button onclick="resetGame()">New Game</button>
+            </div>
+            <div class="error" id="error"></div>
+            <div class="history">
+                <div class="player-history">
+                    <h3>Your Guesses</h3>
+                    <div id="playerGuesses"></div>
+                </div>
+                <div class="ai-history">
+                    <h3>AI Guesses</h3>
+                    <div id="aiGuesses"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let gameOver = false;
+        let currentDifficulty = 'easy';
+
+        // Update difficulty info text
+        function updateDifficultyInfo(difficulty) {
+            const infoText = {
+                'easy': 'Limited memory AI with 30% random guesses',
+                'medium': 'Moderate AI with 15% partially random guesses',
+                'hard': 'Strategic AI with only 5% chance of mistakes'
+            };
+            document.getElementById('difficultyInfo').textContent = infoText[difficulty];
+        }
+
+        // Handle difficulty selection
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentDifficulty = this.dataset.difficulty;
+                updateDifficultyInfo(currentDifficulty);
+            });
+        });
+
+        function addGuessToHistory(container, guess, feedback) {
+            const guessItem = document.createElement('div');
+            guessItem.className = 'guess-item';
+            guessItem.innerHTML = `
+                <div class="guess-number">${guess}</div>
+                <div class="feedback">
+                    Correct digits: ${feedback.correct_digits}<br>
+                    Correct positions: ${feedback.correct_positions}
+                </div>
+            `;
+            container.insertBefore(guessItem, container.firstChild);
+        }
+
+        function makeGuess() {
+            if (gameOver) return;
+            
+            const guessInput = document.getElementById('guessInput');
+            const guess = guessInput.value;
+            const errorDiv = document.getElementById('error');
+            const guessButton = document.getElementById('guessButton');
+            
+            if (!/^\d{4}$/.test(guess)) {
+                errorDiv.textContent = 'Please enter a valid 4-digit number';
+                return;
+            }
+            
+            // Check for duplicates (optional enhancement)
+            const digits = guess.split('');
+            const uniqueDigits = new Set(digits);
+            if (uniqueDigits.size !== 4) {
+                errorDiv.textContent = 'All digits must be different';
+                return;
+            }
+            
+            errorDiv.textContent = '';
+            guessButton.disabled = true;
+            
+            fetch('/guess', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ guess: guess }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                const playerGuesses = document.getElementById('playerGuesses');
+                const aiGuesses = document.getElementById('aiGuesses');
+                
+                // Add player's guess (use player_feedback for consistency)
+                if (data.player_feedback) {
+                    addGuessToHistory(playerGuesses, data.player_guess, data.player_feedback);
+                }
+                
+                // Add AI's guess
+                if (data.ai_guess) {
+                    addGuessToHistory(aiGuesses, data.ai_guess, data.ai_feedback);
+                }
+                
+                if (data.status === 'game_over') {
+                    gameOver = true;
+                    document.getElementById('status').innerHTML = 
+                        `<span class="winner">${data.winner === 'player' ? 'Congratulations! You' : 'AI'} won!</span>`;
+                    guessButton.disabled = true;
+                } else {
+                    document.getElementById('status').textContent = 'Your turn! Enter a 4-digit number.';
+                    guessButton.disabled = false;
+                }
+                
+                guessInput.value = '';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                errorDiv.textContent = 'An error occurred. Please try again.';
+                guessButton.disabled = false;
+            });
+        }
+
+        function resetGame() {
+            fetch('/reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ difficulty: currentDifficulty }),
+            })
+            .then(() => {
+                gameOver = false;
+                document.getElementById('status').textContent = 'Your turn! Enter a 4-digit number.';
+                document.getElementById('playerGuesses').innerHTML = '';
+                document.getElementById('aiGuesses').innerHTML = '';
+                document.getElementById('error').textContent = '';
+                document.getElementById('guessInput').value = '';
+                document.getElementById('guessButton').disabled = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('error').textContent = 'Failed to reset game. Please refresh the page.';
+            });
+        }
+
+        // Allow only numeric input
+        document.getElementById('guessInput').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+
+        // Allow Enter key to submit guess
+        document.getElementById('guessInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                makeGuess();
+            }
+        });
+        
+        // Initialize the game when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            resetGame();
+        });
+    </script>
+</body>
+</html>
